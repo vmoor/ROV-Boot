@@ -378,12 +378,12 @@ LOAD c:/program files (x86)/atmel/avr tools/avr toolchain/bin/../lib/gcc/avr/4.6
  .debug_frame   0x00000000       0x24 main.o
  .debug_frame   0x00000024       0x50 usart.o
 
-.debug_str      0x00000000      0x13f
+.debug_str      0x00000000      0x12f
  *(.debug_str)
- .debug_str     0x00000000       0xf2 main.o
-                                0x126 (size before relaxing)
- .debug_str     0x000000f2       0x4d usart.o
-                                0x10d (size before relaxing)
+ .debug_str     0x00000000       0xe2 main.o
+                                0x116 (size before relaxing)
+ .debug_str     0x000000e2       0x4d usart.o
+                                 0xfd (size before relaxing)
 
 .debug_loc      0x00000000       0x47
  *(.debug_loc)
