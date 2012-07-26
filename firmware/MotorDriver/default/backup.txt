@@ -1,0 +1,216 @@
+#include <avr/io.h>
+#include <avr/interrupt.h> 
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "2313_hard_pwm.h"
+
+#define F_CPU 4000000L
+
+
+
+void init_digital();         // Ports initialisieren (eigene Funktion)  
+void init_timer();           // Timer initialisieren (eigene Funktion)
+void init_interrupt();      // Interrupt initialisieren
+
+//Variablen fuer Motor 1
+uint16_t start_M1;
+uint16_t stop_M1;
+uint16_t impuls_M1;
+uint8_t flanke_M1;
+
+//Variablen fuer Motor 2
+uint16_t start_M2;
+uint16_t stop_M2;
+uint16_t impuls_M2;
+uint8_t flanke_M2;
+
+int main(void)
+{
+    init_digital();
+	init_pwm();	
+	init_timer();
+	init_interrupt();
+
+    //PD1 und PB1 richtung von M2 pwm2
+	//PD6 und PB0 richtung von M1 pwm1
+
+
+	start_M1 = 0;
+	stop_M1 = 0;
+	flanke_M1 = 1;
+	impuls_M1 = 750;
+	 
+
+	sei(); //Interrupts aktivieren
+	
+	while(1)
+	{
+	
+
+		//----------- Motor 1 Steuerung START -------------  
+
+		if ((impuls_M1 > 745) & (impuls_M1 < 755))
+	  	{
+			//falls eingangsignal zwischen 1480 und 1520, M1 anhalten
+			OCR0A = 0x7F;
+		
+			PORTD |= (1<<PD6); 
+    		PORTB |= (1<<PB0); 
+	   		
+	  	} 
+		else if (impuls_M1 < 745)
+	  	{
+			//Rueckwaerts
+
+			//Richtung bestimmen		
+			PORTD &= ~(1<<PD6); 
+    		PORTB |= (1<<PB0);
+			//Geschwindigkeit setzen
+			if(impuls_M1 < 490)
+			{
+				OCR0A = 0x4F;
+			}
+			else
+			{
+				OCR0A = 745 - impuls_M1;
+			}
+
+			
+	  	 	
+	  	}
+		else if (impuls_M1 > 755)
+	  	{
+			//Fortwaerts
+
+			//Geschwindigkeit setzen
+			if(impuls_M1 > 1010)
+			{
+				OCR0A = 0xFF;
+			}
+			else
+			{
+				OCR0A = impuls_M1 - 755;
+			}
+			//Richtung bestimmen
+			PORTD |= (1<<PD6); 
+    		PORTB &= ~(1<<PB0);
+	  	}
+		
+		 
+		//----------- Motor 1 Steuerung ENDE -------------
+		
+		//----------- Motor 2 Steuerung START ------------  
+	  	if (impuls_M2 < 745)
+	  	{
+			//Rueckwaerts
+
+			//Geschwindigkeit setzen
+			if(impuls_M2 < 490)
+			{
+				OCR0B = 0x5F;
+			}
+			else
+			{
+				OCR0B = 745 - impuls_M2;
+			}
+
+			//Richtung bestimmen		
+			PORTD &= ~(1<<PD1); 
+    		PORTB |= (1<<PB1);
+	  	 	
+	  	}
+		else if (impuls_M2 > 755)
+	  	{
+			//Fortwaerts
+
+			//Geschwindigkeit setzen
+			if(impuls_M2 > 1010)
+			{
+				OCR0B = 0xFF;
+			}
+			else
+			{
+				OCR0B =impuls_M2 - 755;
+			}
+			//Richtung bestimmen
+			PORTD |= (1<<PD1); 
+    		PORTB &= ~(1<<PB1);
+	  	}
+		else if ((impuls_M2 > 745) & (impuls_M2 < 755))
+	  	{
+			//falls eingangsignal zwischen 1480 und 1520, M2 anhalten
+			OCR0B = 0xBB;
+		
+			PORTD |= (1<<PD1); 
+    		PORTB |= (1<<PB1); 
+	   		
+	  	}  
+		//----------- Motor 2 Steuerung ENDE --------------
+	}
+}
+
+// Interrupt an INT0 auswerten
+ISR(INT0_vect)
+{
+ 
+ 	if (flanke_M1 == 1)
+  	{
+   		start_M1 = TCNT1;
+   		MCUCR |= (1<<ISC01); //INT0 auf fallende Flanke stellen
+   		MCUCR &= ~(1<<ISC00);
+   		flanke_M1 = 0;
+  	}
+   	else
+    {
+	 	stop_M1 = TCNT1;
+	 	impuls_M1 = stop_M1 - start_M1;
+     	MCUCR |= (1<<ISC00) | (1<<ISC01); //INT0 auf Steigende Flanke stellen (Löst Interrupt bei steigendet Flanke an INT0 aus)
+     	flanke_M1 = 1;  
+    } 
+ 
+}
+
+// Interrupt an INT1 auswerten
+ISR(INT1_vect)
+{
+ 
+ 	if (flanke_M2 == 1)
+  	{
+   		start_M2 = TCNT1;
+   		MCUCR |= (1<<ISC11); //INT1 auf fallende Flanke stellen
+   		MCUCR &= ~(1<<ISC10);
+   		flanke_M2 = 0;
+  	}
+   	else
+    {
+	 	stop_M2 = TCNT1;
+	 	impuls_M2 = stop_M2 - start_M2;
+     	MCUCR |= (1<<ISC10) | (1<<ISC11); //INT1 auf Steigende Flanke stellen (Löst Interrupt bei steigendet Flanke an INT1 aus)
+     	flanke_M2 = 1;  
+    } 
+ 
+}
+
+void init_digital(void)
+/*Diese Funktion initialisiert die verwendeten Ports*/
+{
+  	DDRB |= (1<<DDB0) | (1<<DDB1);  
+  	DDRD |= (1<<DDD1) | (1<<DDD6);
+}
+
+// Timer initialisieren
+void init_timer(void)
+{
+	//Timer 1 (16Bit)
+ 	TCCR1B |= (1<<CS11);  //Vorteiler auf CPU Takt/8
+}
+
+
+// Interrupt auf INT0 und INT1 initialisieren
+void init_interrupt(void)
+{
+	GIMSK  |= (1<<INT0) | (1<<INT1); //Interrupt von INT0 auf Enable
+ 	MCUCR |= (1<<ISC00) | (1<<ISC01) | (1<<ISC10) | (1<<ISC11); //INT0 auf Steigende Flanke stellen (Löst Interrupt bei steigendet Flanke an INT0 aus
+}
