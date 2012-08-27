@@ -10,7 +10,7 @@
 #define BAUD 9600
 #include <util/setbaud.h>
 
-#define UART_MAXSTRLEN 8
+#define UART_MAXSTRLEN 12
 
 volatile uint8_t uart_str_complete = 0;     // 1 .. String komplett empfangen
 volatile uint8_t uart_str_count = 0;
@@ -20,12 +20,13 @@ volatile char uart_string[UART_MAXSTRLEN + 1] = "";
 
 void init_digital();         // Ports initialisieren (eigene Funktion)  
 void init_timer();           // Timer initialisieren (eigene Funktion)
-void init_interrupt();      // Interrupt initialisieren
+void init_interrupt();       // Interrupt initialisieren
 void USART_Init();
-;
 
-volatile int8_t max_span_for_motor = 0x00;
-volatile int8_t schritt_0_5_v = 0x00;
+
+volatile int max_span_for_motor = 0x00;
+volatile int geschw = 0;
+char geschw_arr[3]; 
 
 
 int main(void)
@@ -47,51 +48,77 @@ int main(void)
 //******************************************
 		OCR0A = 0x00;
 	    PORTB |= (1<<PB1); 
-	    PORTD &= ~(1<<PD1);
+	    PORTD |= (1<<PD1);
 //******************************************
 	    OCR0B = 0x00;
 	    PORTB |= (1<<PB0); 
-	    PORTD &= ~(1<<PD6);
+	    PORTD |= (1<<PD6);
 
 	while(1)
 	{
 	
 		if (uart_str_complete == 1) // falls der String komplett empfangen wurde
 		{
-
+				
 			//falls motortreiber mit ID M1
 			if (uart_string[0] == 'M' && uart_string[1] == '1')
 			{
 				
 				
-				if (uart_string[6] == '0')
+				if (uart_string[10] == '0')
 				{
-					schritt_0_5_v = 255; 
+					max_span_for_motor = 0xFF; 
 				}
 				else
-
 				{
-					//TODO spanunganpassung an 9 V
-					max_span_for_motor = 0x5F;
+					if(uart_string[11] == '0') // 10 V
+					{
+						max_span_for_motor = 230; // Spannung auf 9 V reduzieren
+					}
+					else if(uart_string[11] == '1') // 11 V
+					{
+						max_span_for_motor = 209;
+					}
+					else if(uart_string[11] == '2') // 12 V
+					{
+						max_span_for_motor = 192;
+					}
+					else
+					{
+						max_span_for_motor = 100 ;
+					}
+					
 				}
 
 				
-		
-				//Motor M2
-				//
-			//	max_span_for_motor = 0x00;
-			//	for (int8_t i = 0; i <  uart_string[3] +1 ; i++)
-				{
-//					max_span_for_motor = max_span_for_motor + schritt_0_5_v;
-				}
 
-				OCR0A = 0x00 + (max_span_for_motor / 10 * (uart_string[3] +1));
-				if(uart_string[2] == 'V')
+
+
+
+				geschw_arr[0] = uart_string[3];
+				geschw_arr[1] = uart_string[4];
+				geschw_arr[2] = uart_string[5]; 
+
+				geschw = atoi(geschw_arr);
+
+				OCR0B = ((max_span_for_motor*geschw) / 100);
+
+				geschw_arr[0] = uart_string[7];
+				geschw_arr[1] = uart_string[8];
+				geschw_arr[2] = uart_string[9];
+
+				geschw = atoi(geschw_arr);
+
+				OCR0A = ((max_span_for_motor*geschw) / 100);
+				
+				//Motor M2
+				//				
+				if(uart_string[6] == 'V')
 				{
 					 PORTB |= (1<<PB1); 
 	    			 PORTD &= ~(1<<PD1);
 				}
-				else if(uart_string[2] == 'R')
+				else if(uart_string[6] == 'R')
 				{
 					  PORTB &= ~(1<<PB1); 
 	   				  PORTD |= (1<<PD1);
@@ -100,11 +127,13 @@ int main(void)
 				// Motor M1
 			    if(uart_string[2] == 'V')
 				{
-
+					PORTB &= ~(1<<PB0); 
+	    			PORTD |= (1<<PD6);
 				}
 				else if(uart_string[2] == 'R')
 				{
-
+					PORTB |= (1<<PB0); 
+	    			PORTD &= (1<<PD6);
 				}
 
 
@@ -161,13 +190,6 @@ ISR(USART_RX_vect)
  
   // Daten aus dem Puffer lesen
   nextChar = UDR;
-
-  if(nextChar == 'n')
-  {
-	OCR0A = 0x5F;
-  }
-  
-
 
   if( uart_str_complete == 0 ) 	// wenn uart_string gerade in Verwendung, neues Zeichen verwerfen
   {
