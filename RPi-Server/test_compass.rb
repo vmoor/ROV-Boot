@@ -1,7 +1,7 @@
 #! /usr/bin/ruby
-load "compas.rb"
+load "compass.rb"
 
-dev = Compas.new
+dev = Compass.new
 puts dev.get_device
 
 while (true)
