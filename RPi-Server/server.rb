@@ -6,6 +6,7 @@ load 'serial_server.rb'
 
 HOST = "192.168.0.100"
 PORT = 20000
+DATA_PORT = 20002
 VIDEO_PORT = 20001
 
 def start_video
@@ -20,7 +21,7 @@ def server_anfrage(result_json)
 	case result_json["cmd"]
 		when "start_serial"
 			puts "start serial"
-			serial_serv = Serial_server.new(result_json["host"], result_json["port"])
+			serial_serv = Serial_server.new(DATA_PORT)
 			serial_serv.start
 		when "stop_serial"
 			puts "stop serial"
